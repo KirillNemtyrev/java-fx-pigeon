@@ -16,7 +16,7 @@ public class ThisMe {
     private Date createDate;
 
     public String getFileNameAvatar() {
-        return Api.host + "resources/avatar/" + fileNameAvatar;
+        return Api.host + "resources/" + fileNameAvatar;
     }
 
     public Long getId() {

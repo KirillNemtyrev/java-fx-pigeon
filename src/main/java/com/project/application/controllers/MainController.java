@@ -1,12 +1,17 @@
 package com.project.application.controllers;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import com.project.application.Runner;
 import com.project.application.api.Api;
 import com.project.application.config.Config;
+import com.project.application.draw.ChatDraw;
+import com.project.application.entity.ChatEntity;
+import com.project.application.events.NewMessage;
+import com.project.application.events.SendMessage;
 import com.project.application.model.ChatModel;
 import com.project.application.model.MessageModel;
 import com.project.application.model.ThisMe;
-import eu.hansolo.tilesfx.tools.ConicalGradient;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -17,8 +22,10 @@ import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.ImagePattern;
@@ -31,14 +38,34 @@ import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.messaging.simp.stomp.StompFrameHandler;
+import org.springframework.messaging.simp.stomp.StompHeaders;
+import org.springframework.messaging.simp.stomp.StompSession;
+import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
+import org.springframework.util.concurrent.ListenableFuture;
+import org.springframework.web.socket.WebSocketHttpHeaders;
+import org.springframework.web.socket.client.standard.StandardWebSocketClient;
+import org.springframework.web.socket.messaging.WebSocketStompClient;
+import org.springframework.web.socket.sockjs.client.SockJsClient;
+import org.springframework.web.socket.sockjs.client.Transport;
+import org.springframework.web.socket.sockjs.client.WebSocketTransport;
+import org.springframework.web.socket.sockjs.frame.Jackson2SockJsMessageCodec;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
+import java.lang.reflect.Type;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 public class MainController extends Application{
 
+    /*
+     FXML Variables for panel button
+     */
+    @FXML private Pane paneClose;
+    @FXML private Pane paneCollapse;
     /*
      FXML Variables for yourself
      */
@@ -58,6 +85,7 @@ public class MainController extends Application{
     @FXML private Label labelDialogName;
     @FXML private Label labelDialogUserName;
     @FXML private Circle circlePhotoDialog;
+    @FXML private TextField textFieldDialogMessage;
     /*
      Variables for moving scene
      */
@@ -67,7 +95,7 @@ public class MainController extends Application{
     /*
      Objects
      */
-    private Api api = new Api("eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwiaWF0IjoxNjU3MzkyOTI3LCJleHAiOjE2NTc5OTc3Mjd9.Y810dpXco485eq1iApbKiHg9qEX9lyv8UUlhOEhI3S3hVdh_CFBp2LJ2vWGgLBONuALEcd8U08k-c-PsgX5sGw");
+    private Api api = new Api("eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwiaWF0IjoxNjU3ODg0Nzk5LCJleHAiOjE2NTg0ODk1OTl9.c0Eibp1HMZwfEao5M6m0sGYjaOvkYsZqtD61n3ZbhdZqk34RIZUtM1JOpuJfNs3NpNe9IqY5tmmh4DfUn4nX2Q\n");
     private Config config = new Config();
 
     @Override
@@ -99,8 +127,67 @@ public class MainController extends Application{
      */
     @FXML
     public void initialize() throws Exception {
+        new CloseAndCollapse();
+
         new YourSelf().getInformation();
         new ChatsList().drawChatList();
+
+        new WebClient(YourSelf.uuid);
+
+        //System.out.println(api.getSubscribeStickers());
+    }
+
+    /**
+     * This class performs actions with the main buttons of the panel.
+     */
+
+    public class CloseAndCollapse {
+
+        public CloseAndCollapse(){
+
+            MouseOnEnteredCloseButton();
+            MouseOnExitCloseButton();
+            MouseClickedCloseButton();
+
+            MouseOnEnteredCollapseButton();
+            MouseOnExitCollapseButton();
+            MouseClickedCollapseButton();
+        }
+
+        public void MouseOnEnteredCloseButton(){
+            paneClose.setOnMouseEntered(event ->
+                    paneClose.setStyle("-fx-background-color: #0e0e0e"));
+        }
+
+        public void MouseOnExitCloseButton(){
+            paneClose.setOnMouseExited(event ->
+                    paneClose.setStyle("-fx-background-color: #1e1e1e"));
+        }
+
+        public void MouseClickedCloseButton(){
+            paneClose.setOnMouseClicked(event -> {
+                Stage stage = (Stage) paneClose.getScene().getWindow();
+                stage.close();
+            });
+        }
+
+        public void MouseOnEnteredCollapseButton(){
+            paneCollapse.setOnMouseEntered(event ->
+                    paneCollapse.setStyle("-fx-background-color: #0e0e0e"));
+        }
+
+        public void MouseOnExitCollapseButton(){
+            paneCollapse.setOnMouseExited(event ->
+                    paneCollapse.setStyle("-fx-background-color: #1e1e1e"));
+        }
+
+        public void MouseClickedCollapseButton(){
+            paneCollapse.setOnMouseClicked(event -> {
+                Stage stage = (Stage) paneCollapse.getScene().getWindow();
+                stage.setIconified(true);
+            });
+        }
+
     }
 
     public class YourSelf {
@@ -128,6 +215,7 @@ public class MainController extends Application{
     public class ChatsList {
 
         private final int anchorPaneHeight = 695;
+        private static List<ChatEntity> chatEntityList = new ArrayList<>();
 
         private Pane activePane;
         /**
@@ -163,7 +251,7 @@ public class MainController extends Application{
             Collections.sort(list, new Comparator<ChatModel>() {
                 @Override
                 public int compare(ChatModel h, ChatModel v) {
-                    return new Date(h.getLastMessageDate()).compareTo(new Date(v.getLastMessageDate()));
+                    return new Date(v.getLastMessageDate()).compareTo(new Date(h.getLastMessageDate()));
                 }
             });
 
@@ -192,10 +280,10 @@ public class MainController extends Application{
                 labelName.setPrefWidth(238);
                 labelName.setPrefHeight(17);
                 labelName.setAlignment(Pos.CENTER_LEFT);
-                labelName.setFont(Font.font("Consolas", 16));
+                labelName.setFont(Font.font("Consolas", 14));
                 labelName.setTextFill(Paint.valueOf("#9e9e9e"));
 
-                Label labelLastMessage = new Label(chatModel.getLastMessage());
+                Label labelLastMessage = new Label((chatModel.getLastSenderId() == YourSelf.id ? "Вы: " : "") + chatModel.getLastMessage());
                 labelLastMessage.setLayoutX(62);
                 labelLastMessage.setLayoutY(20);
                 labelLastMessage.setPrefWidth(250);
@@ -204,15 +292,46 @@ public class MainController extends Application{
                 labelLastMessage.setFont(Font.font("Consolas", FontWeight.BOLD, 12));
                 labelLastMessage.setTextFill(Paint.valueOf("#807e7e"));
 
-                pane.getChildren().addAll(circlePhoto, labelName, labelLastMessage);
+                String date = new SimpleDateFormat("dd.MM.yyyy", new Locale("ru", "RU")).format(new Date(chatModel.getLastMessageDate()));
+                String clock = new SimpleDateFormat("HH:mm", new Locale("ru", "RU")).format(new Date(chatModel.getLastMessageDate()));
+
+                Label labelLastMessageDate = new Label(date + " в " + clock);
+                labelLastMessageDate.setLayoutX(210);
+                labelLastMessageDate.setLayoutY(4);
+                labelLastMessageDate.setPrefWidth(123);
+                labelLastMessageDate.setPrefHeight(15);
+                labelLastMessageDate.setAlignment(Pos.CENTER_RIGHT);
+                labelLastMessageDate.setFont(Font.font("Consolas", 11));
+                labelLastMessageDate.setTextFill(Paint.valueOf("#9a9999"));
+
+                Circle circleCounter = new Circle();
+                circleCounter.setLayoutX(320);
+                circleCounter.setLayoutY(34);
+                circleCounter.setRadius(10);
+                circleCounter.setFill(Paint.valueOf("#1e90ff"));
+                circleCounter.setVisible(chatModel.getCountNewMessage() != 0);
+
+                Label labelCounter = new Label(chatModel.getCountNewMessage() > 9 ? "9+" : String.valueOf(chatModel.getCountNewMessage()));
+                labelCounter.setLayoutX(chatModel.getCountNewMessage() > 9 ? 314 : 313);
+                labelCounter.setLayoutY(25);
+                labelCounter.setPrefWidth(15);
+                labelCounter.setPrefHeight(15);
+                labelCounter.setAlignment(Pos.CENTER);
+                labelCounter.setFont(Font.font("Consolas", FontWeight.BOLD, 15));
+                labelCounter.setTextFill(Paint.valueOf("white"));
+                labelCounter.setVisible(chatModel.getCountNewMessage() != 0);
+
+                pane.getChildren().addAll(circlePhoto, labelName, labelLastMessage, labelLastMessageDate, circleCounter, labelCounter);
+                ChatDraw chatDraw = new ChatDraw(pane, labelName, labelLastMessage, labelLastMessageDate, circleCounter, labelCounter);
+                ChatEntity chatEntity = new ChatEntity(chatModel, chatDraw);
+
+                chatEntityList.add(chatEntity);
                 anchorPaneChats.getChildren().add(pane);
 
-                pane.setOnMouseEntered(event -> {
-                    pane.setStyle("-fx-background-color : " + ( activePane != pane ? "#181818" : "#111111" ) );
-                });
-                pane.setOnMouseExited(event -> {
-                    pane.setStyle("-fx-background-color : " + ( activePane != pane ? "#212121" : "#141414" ) );
-                });
+                pane.setOnMouseEntered(event ->
+                    pane.setStyle("-fx-background-color : " + ( activePane != pane ? "#181818" : "#111111" ) ));
+                pane.setOnMouseExited(event ->
+                        pane.setStyle("-fx-background-color : " + ( activePane != pane ? "#212121" : "#141414" ) ));
                 pane.setOnMouseClicked(event -> {
                     if(activePane == pane) {
                         return;
@@ -225,6 +344,71 @@ public class MainController extends Application{
                     new ChatDialogue().drawChatDialogue(chatModel);
                 });
             }
+        }
+
+        /**
+         * This function draws the last message in the chat list.
+         * @param chatEntity
+         */
+        @FXML
+        public void drawLastMessage(ChatEntity chatEntity, String text, Long senderId, Long date, Long counter){
+
+            chatEntityList.remove(chatEntity);
+
+            String day = new SimpleDateFormat("dd.MM.yyyy", new Locale("ru", "RU")).format(new Date(date));
+            String clock = new SimpleDateFormat("HH:mm", new Locale("ru", "RU")).format(new Date(date));
+
+            chatEntity.getChatDraw().getLabelLastMessage().setText((senderId == YourSelf.id ? "Вы: " : "") + text);
+            chatEntity.getChatDraw().getLabelLastMessageDate().setText(day + " в " + clock);
+
+            chatEntity.getChatDraw().getCircleCounter().setVisible(counter != 0);
+            chatEntity.getChatDraw().getLabelCounter().setVisible(counter != 0);
+            chatEntity.getChatDraw().getLabelCounter().setLayoutX(counter > 9 ? 314 : 313);
+            chatEntity.getChatDraw().getLabelCounter().setText(counter > 9 ? "9+" : String.valueOf(counter));
+
+            chatEntity.getChatModel().setLastMessage(text);
+            chatEntity.getChatModel().setLastMessageDate(date);
+            chatEntity.getChatModel().setCountNewMessage(counter);
+            chatEntity.getChatModel().setLastSenderId(senderId);
+
+            chatEntityList.add(chatEntity);
+        }
+
+        /**
+         * This function sorts the list with sites by date, and then redraws the new.
+         */
+
+        @FXML
+        public void sortedList(){
+            Collections.sort(chatEntityList, new Comparator<ChatEntity>() {
+                @Override
+                public int compare(ChatEntity h, ChatEntity v) {
+                    return new Date(v.getChatModel().getLastMessageDate()).compareTo(new Date(h.getChatModel().getLastMessageDate()));
+                }
+            });
+
+            for(int i = 0; i < chatEntityList.size(); i++){
+                ChatEntity chatEntity = chatEntityList.get(i);
+                chatEntity.getChatDraw().getPane().setLayoutY(52*i);
+            }
+        }
+
+        /**
+         * This function searches for and returns an object by chat number.
+         * @param userId
+         * @return ChatEntity
+         */
+
+        public ChatEntity getChat(Long userId){
+
+            for(int i = 0; i < chatEntityList.size(); i++) {
+                ChatEntity chatEntity = chatEntityList.get(i);
+                if(chatEntity.getChatModel().getUserId() != userId )
+                    continue;
+
+                return chatEntity;
+            }
+            return null;
         }
     }
 
@@ -241,6 +425,9 @@ public class MainController extends Application{
          */
         @FXML
         public void drawChatDialogue(@NotNull ChatModel chatModel) {
+
+            userId = chatModel.getUserId();
+
             paneNoSelectChat.setVisible(false);
             groupSelectDialog.setVisible(true);
 
@@ -250,6 +437,34 @@ public class MainController extends Application{
             circlePhotoDialog.setFill(new ImagePattern(new Image(chatModel.getFileNameAvatar())));
 
             new ChatMessages().drawMessages(chatModel.getId());
+            ChatEntity chatEntity = new ChatsList().getChat(chatModel.getUserId());
+            chatEntity.getChatDraw().getCircleCounter().setVisible(false);
+            chatEntity.getChatDraw().getLabelCounter().setVisible(false);
+
+            //sendMessage(chatModel.getId());
+            eventClickKey(chatModel.getId());
+        }
+
+        /**
+         * This function sends a message to a specific chat.
+         * @param chatId
+         */
+
+        public void sendMessage(Long chatId){
+            if(textFieldDialogMessage.getText().trim().isEmpty()){
+                return;
+            }
+
+            api.sendMessage(chatId, textFieldDialogMessage.getText().trim());
+        }
+
+        @FXML
+        public void eventClickKey(Long chatId){
+            textFieldDialogMessage.setOnKeyPressed(event -> {
+                if (event.getCode() == KeyCode.ENTER && !textFieldDialogMessage.getText().trim().isEmpty()){
+                    sendMessage(chatId);
+                }
+            });
         }
     }
 
@@ -261,6 +476,59 @@ public class MainController extends Application{
         private static int sumHeight = 10;
         private static Long userId;
         private static Date date;
+
+        /**
+         * This function draws the new message.
+         * @param newMessage
+         */
+        @FXML
+        public void drawNewMessage(NewMessage newMessage){
+
+            ChatsList chatsList = new ChatsList();
+            ChatEntity chatEntity = chatsList.getChat(newMessage.getUserId());
+            if(chatEntity == null){
+                return;
+            }
+
+            if(ChatDialogue.userId == newMessage.getUserId()){
+                api.resetCounter(newMessage.getChatId());
+                drawTextMessage(newMessage.getText(), true, new Date(newMessage.getSendDate()));
+                newMessage.setNewCountMessages(0L);
+            }
+
+            chatsList.drawLastMessage(
+                    new ChatsList().getChat(newMessage.getUserId()),
+                    newMessage.getText(), newMessage.getUserId(),
+                    newMessage.getSendDate(),
+                    newMessage.getNewCountMessages()
+            );
+            chatsList.sortedList();
+        }
+
+        /**
+         * This function draws the sent message.
+         * @param sendMessage
+         */
+        @FXML
+        public void drawSendMessage(SendMessage sendMessage){
+
+            ChatsList chatsList = new ChatsList();
+            ChatEntity chatEntity = chatsList.getChat(sendMessage.getUserId());
+            if(chatEntity == null){
+                return;
+            }
+
+            if(ChatDialogue.userId == sendMessage.getUserId()){
+                drawTextMessage(sendMessage.getText(), true, new Date(sendMessage.getSendDate()));
+            }
+
+            chatsList.drawLastMessage(
+                    new ChatsList().getChat(sendMessage.getUserId()),
+                    sendMessage.getText(), sendMessage.getUserId(),
+                    sendMessage.getSendDate(), 0L
+            );
+            chatsList.sortedList();
+        }
 
         /**
          * The function is used to draw dialog messages.
@@ -282,6 +550,7 @@ public class MainController extends Application{
                         new Date(messageModel.getDate())
                 );
             }
+            anchorPaneDialog.heightProperty().addListener(observable -> scrollPaneDialog.setVvalue(1D));
         }
 
         /**
@@ -379,6 +648,80 @@ public class MainController extends Application{
                 anchorPaneDialog.setPrefHeight(sumHeight + 20);
             }
             scrollPaneDialog.setVvalue(sumHeight);
+        }
+    }
+
+    /**
+     * This class is responsible for receiving data and performing actions from the socket.
+     */
+    public class WebClient {
+
+        StompSession session = null;
+
+        public WebClient(String uuid){
+            try {
+                ListenableFuture<StompSession> socket = this.connect();
+                StompSession stompSession = socket.get();
+
+                this.subscribeGreetings(stompSession, uuid);
+            } catch (ExecutionException | InterruptedException e){
+                throw new RuntimeException(e);
+            }
+        }
+
+        public ListenableFuture<StompSession> connect() {
+
+            Transport webSocketTransport = new WebSocketTransport(new StandardWebSocketClient());
+            List<Transport> transports = Collections.singletonList(webSocketTransport);
+
+            SockJsClient sockJsClient = new SockJsClient(transports);
+            sockJsClient.setMessageCodec(new Jackson2SockJsMessageCodec());
+
+            WebSocketStompClient stompClient = new WebSocketStompClient(sockJsClient);
+
+            return stompClient.connect("ws://{host}:{port}/ws", new WebSocketHttpHeaders(), new MyHandler(), "localhost", 8745);
+        }
+
+        private class MyHandler extends StompSessionHandlerAdapter {
+            public void afterConnected(StompSession stompSession, StompHeaders stompHeaders) {
+                System.out.println("connected");
+                session = stompSession;
+            }
+        }
+
+        public void subscribeGreetings(StompSession stompSession, String uuid) throws ExecutionException, InterruptedException {
+            stompSession.subscribe("/user/" + uuid + "/events", new StompFrameHandler() {
+
+                public Type getPayloadType(StompHeaders stompHeaders) {
+                    return byte[].class;
+                }
+
+                public void handleFrame(StompHeaders stompHeaders, Object o) {
+                    JsonElement jsonElement = new JsonParser().parse(new String((byte[]) o));
+                    switch (jsonElement.getAsJsonObject().get("event").getAsInt()) {
+                        case 0:
+                            System.out.println("0");
+                            return;
+                        case 1:
+                            Platform.runLater(() -> new ChatMessages().drawNewMessage(new NewMessage(
+                                    jsonElement.getAsJsonObject().get("chatId").getAsLong(),
+                                    jsonElement.getAsJsonObject().get("userId").getAsLong(),
+                                    jsonElement.getAsJsonObject().get("sendDate").getAsLong(),
+                                    jsonElement.getAsJsonObject().get("newCountMessages").getAsLong(),
+                                    jsonElement.getAsJsonObject().get("text").getAsString())
+                            ));
+                            return;
+                        case 2:
+                            Platform.runLater(() -> new ChatMessages().drawSendMessage(new SendMessage(
+                                    jsonElement.getAsJsonObject().get("chatId").getAsLong(),
+                                    jsonElement.getAsJsonObject().get("userId").getAsLong(),
+                                    jsonElement.getAsJsonObject().get("sendDate").getAsLong(),
+                                    jsonElement.getAsJsonObject().get("text").getAsString())
+                            ));
+                            return;
+                    }
+                }
+            });
         }
     }
 }

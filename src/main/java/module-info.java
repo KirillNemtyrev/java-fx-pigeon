@@ -12,6 +12,13 @@ module com.project.application {
     requires com.almasb.fxgl.all;
     requires com.google.gson;
 
+    requires spring.websocket;
+    requires spring.messaging;
+    requires tyrus.standalone.client;
+    requires org.apache.httpcomponents.httpmime;
+    requires java.desktop;
+    requires spring.core;
+
     requires org.apache.httpcomponents.httpclient;
     requires org.apache.httpcomponents.httpcore;
     requires annotations;

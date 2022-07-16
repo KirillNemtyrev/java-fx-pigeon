@@ -456,6 +456,7 @@ public class MainController extends Application{
             }
 
             api.sendMessage(chatId, textFieldDialogMessage.getText().trim());
+            textFieldDialogMessage.clear();
         }
 
         @FXML
@@ -497,7 +498,7 @@ public class MainController extends Application{
             }
 
             chatsList.drawLastMessage(
-                    new ChatsList().getChat(newMessage.getUserId()),
+                    chatEntity,
                     newMessage.getText(), newMessage.getUserId(),
                     newMessage.getSendDate(),
                     newMessage.getNewCountMessages()
@@ -519,12 +520,13 @@ public class MainController extends Application{
             }
 
             if(ChatDialogue.userId == sendMessage.getUserId()){
-                drawTextMessage(sendMessage.getText(), true, new Date(sendMessage.getSendDate()));
+                drawTextMessage(sendMessage.getText(), false, new Date(sendMessage.getSendDate()));
             }
 
             chatsList.drawLastMessage(
-                    new ChatsList().getChat(sendMessage.getUserId()),
-                    sendMessage.getText(), sendMessage.getUserId(),
+                    chatEntity,
+                    sendMessage.getText(),
+                    YourSelf.id,
                     sendMessage.getSendDate(), 0L
             );
             chatsList.sortedList();
@@ -546,7 +548,7 @@ public class MainController extends Application{
                 MessageModel messageModel = messageModels.get(count);
 
                 drawTextMessage(messageModel.getText(),
-                        messageModel.getSenderId() != id,
+                        messageModel.getSenderId() != YourSelf.id,
                         new Date(messageModel.getDate())
                 );
             }

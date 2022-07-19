@@ -7,11 +7,10 @@ import com.project.application.api.Api;
 import com.project.application.config.Config;
 import com.project.application.draw.ChatDraw;
 import com.project.application.entity.ChatEntity;
+import com.project.application.entity.StickerEntity;
 import com.project.application.events.NewMessage;
 import com.project.application.events.SendMessage;
-import com.project.application.model.ChatModel;
-import com.project.application.model.MessageModel;
-import com.project.application.model.ThisMe;
+import com.project.application.model.*;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -31,6 +30,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.paint.ImagePattern;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
@@ -60,6 +60,10 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 public class MainController extends Application{
+    /*
+     FXML Main variable
+     */
+     @FXML private Pane paneMain;
 
     /*
      FXML Variables for panel button
@@ -86,6 +90,15 @@ public class MainController extends Application{
     @FXML private Label labelDialogUserName;
     @FXML private Circle circlePhotoDialog;
     @FXML private TextField textFieldDialogMessage;
+    /*
+     Variables for stickers
+     */
+    @FXML private ImageView imageDialogStickers;
+    @FXML private Pane paneStickers;
+    @FXML private ScrollPane scrollPaneStickers;
+    @FXML private AnchorPane anchorPaneStickers;
+    @FXML private ScrollPane scrollPaneListStickers;
+    @FXML private AnchorPane anchorPaneListStickers;
     /*
      Variables for moving scene
      */
@@ -131,6 +144,7 @@ public class MainController extends Application{
 
         new YourSelf().getInformation();
         new ChatsList().drawChatList();
+        new Stickers().drawListStickers();
 
         new WebClient(YourSelf.uuid);
 
@@ -261,89 +275,101 @@ public class MainController extends Application{
 
                 Pane pane = new Pane();
                 pane.setLayoutX(0);
-                pane.setLayoutY(52*count);
+                pane.setLayoutY(63*count);
                 pane.setPrefWidth(350);
-                pane.setPrefHeight(52);
+                pane.setPrefHeight(63);
                 pane.setCursor(Cursor.HAND);
-                pane.setStyle("-fx-background-color : #212121");
+                pane.setStyle("-fx-background-color : #181818");
 
                 Circle circlePhoto = new Circle();
                 //circlePhoto.setId("circlePhoto");
-                circlePhoto.setLayoutX(31);
-                circlePhoto.setLayoutY(26);
+                circlePhoto.setLayoutX(35);
+                circlePhoto.setLayoutY(32);
                 circlePhoto.setRadius(20);
                 circlePhoto.setFill(new ImagePattern(new Image(chatModel.getFileNameAvatar())));
 
                 Label labelName = new Label(chatModel.getName());
-                labelName.setLayoutX(62);
-                labelName.setLayoutY(3);
-                labelName.setPrefWidth(238);
+                labelName.setLayoutX(72);
+                labelName.setLayoutY(7);
+                labelName.setPrefWidth(198);
                 labelName.setPrefHeight(17);
                 labelName.setAlignment(Pos.CENTER_LEFT);
                 labelName.setFont(Font.font("Consolas", 14));
                 labelName.setTextFill(Paint.valueOf("#9e9e9e"));
 
                 Label labelLastMessage = new Label((chatModel.getLastSenderId() == YourSelf.id ? "Вы: " : "") + chatModel.getLastMessage());
-                labelLastMessage.setLayoutX(62);
-                labelLastMessage.setLayoutY(20);
-                labelLastMessage.setPrefWidth(250);
-                labelLastMessage.setPrefHeight(20);
+                labelLastMessage.setLayoutX(72);
+                labelLastMessage.setLayoutY(24);
+                labelLastMessage.setPrefWidth(229);
+                labelLastMessage.setPrefHeight(30);
                 labelLastMessage.setAlignment(Pos.TOP_LEFT);
                 labelLastMessage.setFont(Font.font("Consolas", FontWeight.BOLD, 12));
                 labelLastMessage.setTextFill(Paint.valueOf("#807e7e"));
 
                 String date = new SimpleDateFormat("dd.MM.yyyy", new Locale("ru", "RU")).format(new Date(chatModel.getLastMessageDate()));
-                String clock = new SimpleDateFormat("HH:mm", new Locale("ru", "RU")).format(new Date(chatModel.getLastMessageDate()));
+                //String clock = new SimpleDateFormat("HH:mm", new Locale("ru", "RU")).format(new Date(chatModel.getLastMessageDate()));
 
-                Label labelLastMessageDate = new Label(date + " в " + clock);
-                labelLastMessageDate.setLayoutX(210);
-                labelLastMessageDate.setLayoutY(4);
-                labelLastMessageDate.setPrefWidth(123);
-                labelLastMessageDate.setPrefHeight(15);
+                Label labelLastMessageDate = new Label(date);// + " в " + clock);
+                labelLastMessageDate.setLayoutX(275);
+                labelLastMessageDate.setLayoutY(8);
+                labelLastMessageDate.setPrefWidth(61);
+                labelLastMessageDate.setPrefHeight(13);
                 labelLastMessageDate.setAlignment(Pos.CENTER_RIGHT);
                 labelLastMessageDate.setFont(Font.font("Consolas", 11));
                 labelLastMessageDate.setTextFill(Paint.valueOf("#9a9999"));
 
                 Circle circleCounter = new Circle();
-                circleCounter.setLayoutX(320);
-                circleCounter.setLayoutY(34);
-                circleCounter.setRadius(10);
-                circleCounter.setFill(Paint.valueOf("#1e90ff"));
+                circleCounter.setLayoutX(315);
+                circleCounter.setLayoutY(39);
+                circleCounter.setRadius(12);
+                circleCounter.setFill(Paint.valueOf("#495b6b"));
                 circleCounter.setVisible(chatModel.getCountNewMessage() != 0);
 
                 Label labelCounter = new Label(chatModel.getCountNewMessage() > 9 ? "9+" : String.valueOf(chatModel.getCountNewMessage()));
-                labelCounter.setLayoutX(chatModel.getCountNewMessage() > 9 ? 314 : 313);
-                labelCounter.setLayoutY(25);
-                labelCounter.setPrefWidth(15);
-                labelCounter.setPrefHeight(15);
+                labelCounter.setLayoutX(308);
+                labelCounter.setLayoutY(31);
+                labelCounter.setPrefWidth(14);
+                labelCounter.setPrefHeight(17);
                 labelCounter.setAlignment(Pos.CENTER);
-                labelCounter.setFont(Font.font("Consolas", FontWeight.BOLD, 15));
+                labelCounter.setFont(Font.font("Consolas", 13));
                 labelCounter.setTextFill(Paint.valueOf("white"));
                 labelCounter.setVisible(chatModel.getCountNewMessage() != 0);
 
-                pane.getChildren().addAll(circlePhoto, labelName, labelLastMessage, labelLastMessageDate, circleCounter, labelCounter);
-                ChatDraw chatDraw = new ChatDraw(pane, labelName, labelLastMessage, labelLastMessageDate, circleCounter, labelCounter);
+                Line line = new Line();
+                line.setLayoutX(171);
+                line.setLayoutY(58);
+                line.setStartX(-100);
+                line.setStartY(0);
+                line.setEndX(175);
+                line.setEndY(0);
+                line.setStroke(Paint.valueOf("black"));
+                line.setStrokeWidth(0.5);
+                line.setVisible(count < list.size() - 1);
+
+                pane.getChildren().addAll(circlePhoto, labelName, labelLastMessage, labelLastMessageDate, circleCounter, labelCounter, line);
+                ChatDraw chatDraw = new ChatDraw(pane, labelName, labelLastMessage, labelLastMessageDate, circleCounter, labelCounter, line);
                 ChatEntity chatEntity = new ChatEntity(chatModel, chatDraw);
 
                 chatEntityList.add(chatEntity);
                 anchorPaneChats.getChildren().add(pane);
 
                 pane.setOnMouseEntered(event ->
-                    pane.setStyle("-fx-background-color : " + ( activePane != pane ? "#181818" : "#111111" ) ));
+                    pane.setStyle("-fx-background-color : " + ( activePane != pane ? "#151515" : "#1e1d1e" ) ));
                 pane.setOnMouseExited(event ->
-                        pane.setStyle("-fx-background-color : " + ( activePane != pane ? "#212121" : "#141414" ) ));
+                        pane.setStyle("-fx-background-color : " + ( activePane != pane ? "#181818" : "#252125" ) ));
                 pane.setOnMouseClicked(event -> {
                     if(activePane == pane) {
                         return;
                     }
                     if(activePane != null) {
-                        activePane.setStyle("-fx-background-color: #212121");
+                        activePane.setStyle("-fx-background-color: #181818");
                     }
                     activePane = pane;
-                    pane.setStyle("-fx-background-color: #111111");
+                    pane.setStyle("-fx-background-color: #1e1d1e");
                     new ChatDialogue().drawChatDialogue(chatModel);
                 });
             }
+            anchorPaneChats.setPrefHeight(63 * list.size() > 768 ? 63 * list.size() : 768);
         }
 
         /**
@@ -356,14 +382,11 @@ public class MainController extends Application{
             chatEntityList.remove(chatEntity);
 
             String day = new SimpleDateFormat("dd.MM.yyyy", new Locale("ru", "RU")).format(new Date(date));
-            String clock = new SimpleDateFormat("HH:mm", new Locale("ru", "RU")).format(new Date(date));
-
             chatEntity.getChatDraw().getLabelLastMessage().setText((senderId == YourSelf.id ? "Вы: " : "") + text);
-            chatEntity.getChatDraw().getLabelLastMessageDate().setText(day + " в " + clock);
+            chatEntity.getChatDraw().getLabelLastMessageDate().setText(day);
 
             chatEntity.getChatDraw().getCircleCounter().setVisible(counter != 0);
             chatEntity.getChatDraw().getLabelCounter().setVisible(counter != 0);
-            chatEntity.getChatDraw().getLabelCounter().setLayoutX(counter > 9 ? 314 : 313);
             chatEntity.getChatDraw().getLabelCounter().setText(counter > 9 ? "9+" : String.valueOf(counter));
 
             chatEntity.getChatModel().setLastMessage(text);
@@ -389,7 +412,9 @@ public class MainController extends Application{
 
             for(int i = 0; i < chatEntityList.size(); i++){
                 ChatEntity chatEntity = chatEntityList.get(i);
-                chatEntity.getChatDraw().getPane().setLayoutY(52*i);
+                chatEntity.getChatDraw().getPane().setLayoutY(63*i);
+                
+                chatEntity.getChatDraw().getLine().setVisible(i < chatEntityList.size() - 1);
             }
         }
 
@@ -433,6 +458,7 @@ public class MainController extends Application{
 
             labelDialogName.setText(chatModel.getName());
             labelDialogUserName.setText("@" + chatModel.getUsername());
+            textFieldDialogMessage.setPromptText("Написать @" + chatModel.getUsername());
 
             circlePhotoDialog.setFill(new ImagePattern(new Image(chatModel.getFileNameAvatar())));
 
@@ -631,6 +657,8 @@ public class MainController extends Application{
             labelMessage.setFont(Font.font("Times New Roman", 15));
             labelMessage.setAlignment(Pos.TOP_LEFT);
             labelMessage.setTextFill(Paint.valueOf("#222222"));
+            labelMessage.setManaged(true);
+            //labelMessage.get
 
             Label labelClock = new Label(new SimpleDateFormat("HH:mm").format(date));
             Text textClock = new Text(labelClock.getText());
@@ -650,6 +678,130 @@ public class MainController extends Application{
                 anchorPaneDialog.setPrefHeight(sumHeight + 20);
             }
             scrollPaneDialog.setVvalue(sumHeight);
+        }
+    }
+
+    /**
+     * This class is fully responsible for the work of stickers.
+     */
+    public class Stickers {
+
+        public static List<StickerEntity> stickerEntities = new ArrayList<>();
+        private static int sumHeight = 6;
+
+        @FXML
+        public void drawListStickers(){
+            anchorPaneStickers.getChildren().clear();
+            List<StickerList> stickerLists = api.getSubscribeStickers();
+
+            for(int count = 0; count < stickerLists.size(); count++) {
+
+                StickerEntity stickerEntity = new StickerEntity();
+                StickerList stickerList = stickerLists.get(count);
+
+                Label labelSticker = new Label(stickerList.getName());
+                labelSticker.setLayoutX(14);
+                labelSticker.setLayoutY(sumHeight);
+                labelSticker.setPrefWidth(407);
+                labelSticker.setPrefHeight(17);
+                labelSticker.setFont(Font.font("Consolas", 14));
+                labelSticker.setTextFill(Paint.valueOf("#aeaeae"));
+                sumHeight += 19;
+                stickerEntity.setValue(sumHeight);
+                stickerEntity.setStickerList(stickerList);
+                stickerEntities.add(stickerEntity);
+
+                for(int i = 0; i < stickerList.getStickers().size(); i+=4){
+
+                    for(int j = 0; j < 4; j++){
+
+                        if(i + j >= stickerList.getStickers().size()){
+                            break;
+                        }
+                        Sticker stickerPack = stickerList.getStickers().get(i + j);
+                        if(stickerPack == null){
+                            break;
+                        }
+
+                        Pane pane = new Pane();
+                        pane.setLayoutX(0 + 108*j);
+                        pane.setLayoutY(sumHeight);
+                        pane.setPrefWidth(108);
+                        pane.setPrefHeight(101);
+
+                        ImageView imageView = new ImageView(new Image(Api.host + "resources/" + stickerPack.getSticker()));
+                        imageView.setLayoutX(14);
+                        imageView.setLayoutY(11);
+                        imageView.setFitWidth(80);
+                        imageView.setFitHeight(80);
+
+                        pane.getChildren().add(imageView);
+                        anchorPaneStickers.getChildren().add(pane);
+
+                    }
+                    sumHeight += 99;
+                }
+
+                anchorPaneStickers.getChildren().addAll(labelSticker);
+            }
+            anchorPaneStickers.setPrefHeight(sumHeight > 288 ? sumHeight : 288);
+            scrollPaneStickers.setVmax(sumHeight);
+
+            imageDialogStickers.setOnMouseEntered(event -> paneStickers.setVisible(true));
+            paneStickers.setOnMouseExited(event -> paneStickers.setVisible(false));
+
+            drawListStickerPacks();
+        }
+
+        /**
+         *
+         */
+        public void drawListStickerPacks(){
+
+            anchorPaneListStickers.getChildren().clear();
+            for(int count = 0; count < stickerEntities.size(); count++){
+
+                Pane pane = new Pane();
+                pane.setLayoutX(40*count);
+                pane.setLayoutY(0);
+                pane.setPrefWidth(40);
+                pane.setPrefHeight(36);
+
+                ImageView imageView = new ImageView(new Image(Api.host + "resources/" + stickerEntities.get(count).getStickerList().getIcon()));
+                imageView.setLayoutX(7);
+                imageView.setLayoutY(4);
+                imageView.setFitWidth(28);
+                imageView.setFitHeight(28);
+                pane.getChildren().add(imageView);
+
+                anchorPaneListStickers.getChildren().add(pane);
+
+                Text text = new Text(stickerEntities.get(count).getStickerList().getName());
+                text.setFont(Font.font("Consolas", 14));
+
+                Label labelName = new Label(text.getText());
+                labelName.setVisible(false);
+                labelName.setPrefWidth(text.getLayoutBounds().getWidth() + 10);
+                labelName.setPrefHeight(text.getLayoutBounds().getHeight());
+                labelName.setAlignment(Pos.CENTER);
+                labelName.setFont(Font.font("Consolas", 14));
+                labelName.setTextFill(Paint.valueOf("#bfbfbf"));
+                labelName.setStyle("-fx-background-color: #121212; -fx-background-radius: 20px;-fx-border-color:black;-fx-border-radius:20px");
+                paneMain.getChildren().add(labelName);
+
+                float value = (float) stickerEntities.get(count).getValue();
+                pane.setOnMouseClicked(event -> scrollPaneStickers.setVvalue(value));
+
+                pane.setOnMouseEntered(event -> {
+
+                    labelName.setVisible(true);
+                    labelName.setLayoutX(event.getSceneX() + 5);
+                    labelName.setLayoutY(event.getSceneY() + 5);
+
+                });
+                pane.setOnMouseExited(event -> labelName.setVisible(false));
+            }
+
         }
     }
 

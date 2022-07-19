@@ -15,6 +15,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 
+import com.project.application.entity.RequestEntity;
 import com.project.application.model.ChatModel;
 import com.project.application.model.MessageModel;
 import com.project.application.model.StickerList;
@@ -122,7 +123,7 @@ public class Api {
      * @param text
      */
 
-    public void sendMessage(@NotNull Long id, @NotNull String text) {
+    public RequestEntity sendMessage(@NotNull Long id, @NotNull String text) {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
 
             String params = "{ \"chatId\" : " + id + ",\"text\" : \"" + text + "\"}";
@@ -142,9 +143,12 @@ public class Api {
             while ((lineForBuffer = bufferedReader.readLine()) != null) {
                 stringBuffer.append(lineForBuffer);
             }
+
+            return new RequestEntity(response.getStatusLine().getStatusCode(), stringBuffer.toString());
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return null;
     }
 
     /**
